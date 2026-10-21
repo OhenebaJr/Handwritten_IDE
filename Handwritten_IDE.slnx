@@ -1,3 +1,12 @@
 <Solution>
+  <Folder Name="/wwwroot/">
+    <File Path="index.html" />
+  </Folder>
+  <Folder Name="/wwwroot/css/">
+    <File Path="style.css" />
+  </Folder>
+  <Folder Name="/wwwroot/js/">
+    <File Path="capture.js" />
+  </Folder>
   <Project Path="Handwritten_IDE/Handwritten_IDE.csproj" />
 </Solution>
