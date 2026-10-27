@@ -9,7 +9,14 @@
 </head>
 <body>
     <h1>Stroke capture prototype</h1>
-    <p id="status">JS not loaded</p>
+    <div class="toolbar">
+        <button id="clearBtn">Clear</button>
+        <button id="exportBtn">Export JSON</button>
+        <span id="status">Strokes: 0</span>
+    </div>
+    <canvas id="ink"></canvas>
+    <h3>Last Stroke</h3>
+    <pre id="lastStroke">(none yet)</pre>
     <script src="js/capture.js"></script>
 </body>
 </html>
