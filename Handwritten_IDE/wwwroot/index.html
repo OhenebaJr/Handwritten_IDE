@@ -12,11 +12,18 @@
     <div class="toolbar">
         <button id="clearBtn">Clear</button>
         <button id="exportBtn">Export JSON</button>
-        <span id="status">Strokes: 0</span>
+        <span id="status">Strokes: 0 | Rows: 8</span>
     </div>
-    <canvas id="ink"></canvas>
+
+    <div id="area" class="writing-area">
+        <canvas id="ink"></canvas>
+    </div>
+
+    <h3>Strokes per row</h3>
+    <pre id="rowSummary">(none yet)</pre>
     <h3>Last Stroke</h3>
     <pre id="lastStroke">(none yet)</pre>
+
     <script src="js/capture.js"></script>
 </body>
 </html>

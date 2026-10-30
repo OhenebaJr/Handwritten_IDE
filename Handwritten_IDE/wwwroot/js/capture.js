@@ -1,30 +1,73 @@
+// ---- Tunable constants (to be set during testing on the iPad) ----
+const LINE_HEIGHT = 35;          // px per ruled row
+const TOP_MARGIN = 10;           // px above the first row
+const INITIAL_ROWS = 10;
+const MIN_EMPTY_ROWS = 3;        // keep at least this many empty rows below the last used row
+const ALLOWED_TYPES = ['pen'];   // stylus only for drawing
+const ALLOW_FINGER_SCROLL = true;
+
+const area = document.getElementById('area');
 const canvas = document.getElementById('ink');
 const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const lastEl = document.getElementById('lastStroke');
+const rowSummaryEl = document.getElementById('rowSummary');
 
-const ALLOWED_TYPES = ['pen'];   // stylus only
-const strokes = [];              // completed strokes
-let current = null;              // stroke being drawn
+const strokes = [];
+let current = null;
 let nextId = 1;
+let rows = INITIAL_ROWS;
+let touchScroll = null;
+
+// ---- Layout ----
+function canvasHeight() { return TOP_MARGIN + rows * LINE_HEIGHT; }
 
 function resizeCanvas() {
     const dpr = window.devicePixelRatio || 1;
-    const rect = canvas.getBoundingClientRect();
-    canvas.width = rect.width * dpr;
-    canvas.height = rect.height * dpr;
+    const w = area.clientWidth;
+    const h = canvasHeight();
+    canvas.style.width = w + 'px';
+    canvas.style.height = h + 'px';
+    canvas.width = w * dpr;
+    canvas.height = h * dpr;
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    ctx.lineWidth = 2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = '#000';
     redraw();
 }
 
-function redraw() {
-    const rect = canvas.getBoundingClientRect();
-    ctx.clearRect(0, 0, rect.width, rect.height);
-    for (const s of strokes) drawStroke(s.points);
+function rowOfY(y) {
+    const r = Math.floor((y - TOP_MARGIN) / LINE_HEIGHT);
+    return Math.max(0, Math.min(rows - 1, r));
+}
+
+// Row where most of the stroke's points fall (ties go to the upper row)
+function majorityRow(points) {
+    const counts = new Map();
+    for (const p of points) {
+        const r = rowOfY(p.y);
+        counts.set(r, (counts.get(r) || 0) + 1);
+    }
+    let best = -1, bestCount = -1;
+    for (const [r, c] of counts) {
+        if (c > bestCount || (c === bestCount && r < best)) { best = r; bestCount = c; }
+    }
+    return best;
+}
+
+// ---- Drawing ----
+function drawRules() {
+    const w = area.clientWidth;
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = '#c8d4e3';
+    ctx.fillStyle = '#9aa7b8';
+    ctx.font = '11px sans-serif';
+    for (let r = 0; r < rows; r++) {
+        const y = TOP_MARGIN + (r + 1) * LINE_HEIGHT;
+        ctx.beginPath();
+        ctx.moveTo(0, y);
+        ctx.lineTo(w, y);
+        ctx.stroke();
+        ctx.fillText(String(r + 1), 4, y - LINE_HEIGHT + 14);
+    }
 }
 
 function drawStroke(points) {
@@ -32,12 +75,27 @@ function drawStroke(points) {
     ctx.beginPath();
     ctx.moveTo(points[0].x, points[0].y);
     for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
-    if (points.length === 1) ctx.lineTo(points[0].x + 0.01, points[0].y); // dot
+    if (points.length === 1) ctx.lineTo(points[0].x + 0.01, points[0].y);
     ctx.stroke();
 }
 
+function setInkStyle() {
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = '#000';
+}
+
+function redraw() {
+    ctx.clearRect(0, 0, area.clientWidth, canvasHeight());
+    drawRules();
+    setInkStyle();
+    for (const s of strokes) drawStroke(s.points);
+}
+
+// ---- Data ----
 function toPoint(e) {
-    const rect = canvas.getBoundingClientRect();
+    const rect = canvas.getBoundingClientRect(); // accounts for scrolling
     return {
         x: e.clientX - rect.left,
         y: e.clientY - rect.top,
@@ -46,14 +104,36 @@ function toPoint(e) {
     };
 }
 
+function updateSummary() {
+    const counts = {};
+    for (const s of strokes) counts[s.row] = (counts[s.row] || 0) + 1;
+    const lines = Object.keys(counts)
+        .map(Number).sort((a, b) => a - b)
+        .map(r => `Row ${r + 1}: ${counts[r]} stroke(s)`);
+    rowSummaryEl.textContent = lines.length ? lines.join('\n') : '(none yet)';
+    statusEl.textContent = `Strokes: ${strokes.length} | Rows: ${rows}`;
+}
+
+// ---- Pointer handling ----
 canvas.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'touch' && ALLOW_FINGER_SCROLL) {
+        canvas.setPointerCapture(e.pointerId);
+        touchScroll = { id: e.pointerId, lastY: e.clientY };
+        return;
+    }
     if (!ALLOWED_TYPES.includes(e.pointerType)) return;
     e.preventDefault();
     canvas.setPointerCapture(e.pointerId);
-    current = { id: nextId++, pointerType: e.pointerType, points: [toPoint(e)] };
+    setInkStyle();
+    current = { id: nextId++, pointerType: e.pointerType, row: null, points: [toPoint(e)] };
 });
 
 canvas.addEventListener('pointermove', e => {
+    if (touchScroll && e.pointerId === touchScroll.id) {
+        area.scrollTop -= (e.clientY - touchScroll.lastY);
+        touchScroll.lastY = e.clientY;
+        return;
+    }
     if (!current) return;
     const events = e.getCoalescedEvents ? e.getCoalescedEvents() : [e];
     const list = events.length ? events : [e];
@@ -68,26 +148,38 @@ canvas.addEventListener('pointermove', e => {
     }
 });
 
-function endStroke(e) {
+function endPointer(e) {
+    if (touchScroll && e.pointerId === touchScroll.id) { touchScroll = null; return; }
     if (!current) return;
+    current.row = majorityRow(current.points);
     strokes.push(current);
     lastEl.textContent = JSON.stringify(current, null, 1);
-    statusEl.textContent = `Strokes: ${strokes.length}`;
-    current = null;
-}
-canvas.addEventListener('pointerup', endStroke);
-canvas.addEventListener('pointercancel', endStroke);
 
+    // Grow the writing area so there are always empty rows below the last used one
+    if (current.row + 1 + MIN_EMPTY_ROWS > rows) {
+        rows = current.row + 1 + MIN_EMPTY_ROWS;
+        resizeCanvas();
+    }
+    current = null;
+    updateSummary();
+}
+canvas.addEventListener('pointerup', endPointer);
+canvas.addEventListener('pointercancel', endPointer);
+
+// ---- Buttons ----
 document.getElementById('clearBtn').addEventListener('click', () => {
     strokes.length = 0;
     current = null;
-    redraw();
-    statusEl.textContent = 'Strokes: 0';
+    rows = INITIAL_ROWS;
+    area.scrollTop = 0;
+    resizeCanvas();
     lastEl.textContent = '(none yet)';
+    updateSummary();
 });
 
 document.getElementById('exportBtn').addEventListener('click', () => {
-    const blob = new Blob([JSON.stringify({ strokes }, null, 1)], { type: 'application/json' });
+    const data = { lineHeight: LINE_HEIGHT, topMargin: TOP_MARGIN, rows, strokes };
+    const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'strokes.json';
@@ -97,3 +189,4 @@ document.getElementById('exportBtn').addEventListener('click', () => {
 
 window.addEventListener('resize', resizeCanvas);
 resizeCanvas();
+updateSummary();

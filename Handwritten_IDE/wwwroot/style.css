@@ -10,6 +10,13 @@ body
     margin-bottom: .5rem;
 }
 
+.writing-area {
+    height: 65vh;
+    overflow-y: auto;
+    border: 1px solid #888;
+    background: #fff;
+}
+
 #ink {
     display: block;
     width: 100%;
@@ -17,6 +24,13 @@ body
     border: 1px solid #888;
     background: #fff;
     touch-action: none; /*stops the iPad from scrolling/zooming when writing*/
+}
+
+pre {
+    max-height: 160px;
+    overflow: auto;
+    background: #f4f4f4;
+    padding: .5rem;
 }
 
 #lastStroke {
