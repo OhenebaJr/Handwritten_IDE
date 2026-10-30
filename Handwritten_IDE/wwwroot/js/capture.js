@@ -1,7 +1,7 @@
 // ---- Tunable constants (to be set during testing on the iPad) ----
 const LINE_HEIGHT = 35;          // px per ruled row
 const TOP_MARGIN = 10;           // px above the first row
-const INITIAL_ROWS = 10;
+const INITIAL_ROWS = 11;
 const MIN_EMPTY_ROWS = 3;        // keep at least this many empty rows below the last used row
 const ALLOWED_TYPES = ['pen'];   // stylus only for drawing
 const ALLOW_FINGER_SCROLL = true;
@@ -123,7 +123,7 @@ canvas.addEventListener('pointerdown', e => {
     }
     if (!ALLOWED_TYPES.includes(e.pointerType)) return;
     e.preventDefault();
-    canvas.setPointerCapture(e.pointerId);
+    canvas.setPointerCapture(e.pointerId); 
     setInkStyle();
     current = { id: nextId++, pointerType: e.pointerType, row: null, points: [toPoint(e)] };
 });
@@ -165,6 +165,26 @@ function endPointer(e) {
 }
 canvas.addEventListener('pointerup', endPointer);
 canvas.addEventListener('pointercancel', endPointer);
+
+// ---- Prevent selection and context menu ----
+['selectstart', 'contextmenu', 'dblclick'].forEach(type =>
+    area.addEventListener(type, e => e.preventDefault())
+);
+
+document.addEventListener('selectstart', e => {
+    const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
+    if (!el || !el.closest('pre')) e.preventDefault();
+});
+
+// Block iOS zoom gestures on the writing area
+document.addEventListener('gesturestart', e => e.preventDefault());
+
+let lastTouchEnd = 0;
+area.addEventListener('touchend', e => {
+    const now = e.timeStamp;
+    if (now - lastTouchEnd < 350) e.preventDefault();  // second tap of a double-tap
+    lastTouchEnd = now;
+}, { passive: false });
 
 // ---- Buttons ----
 document.getElementById('clearBtn').addEventListener('click', () => {

@@ -1,6 +1,11 @@
-body
-{
-    font-family: sans-serif; margin: 1rem;
+body {
+    font-family: sans-serif;
+    margin: 1rem;
+    touch-action: manipulation; /* turns off double-tap zoom on the page */
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .toolbar {
@@ -31,6 +36,8 @@ pre {
     overflow: auto;
     background: #f4f4f4;
     padding: .5rem;
+    -webkit-user-select: text;
+    user-select: text;
 }
 
 #lastStroke {
