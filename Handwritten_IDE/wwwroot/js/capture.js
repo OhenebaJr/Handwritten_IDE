@@ -1,7 +1,7 @@
 // ---- Tunable constants (to be set during testing on the iPad) ----
 const LINE_HEIGHT = 35;          // px per ruled row
 const TOP_MARGIN = 10;           // px above the first row
-const INITIAL_ROWS = 11;
+const INITIAL_ROWS = 12;
 const MIN_EMPTY_ROWS = 3;        // keep at least this many empty rows below the last used row
 const ALLOWED_TYPES = ['pen'];   // stylus only for drawing
 const ALLOW_FINGER_SCROLL = true;
@@ -13,7 +13,6 @@ const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const lastEl = document.getElementById('lastStroke');
 const rowSummaryEl = document.getElementById('rowSummary');
-const recognizedEl = document.getElementById('recognizedText');
 const recognizeStatusEl = document.getElementById('recognizeStatus');
 
 const strokes = [];
@@ -131,11 +130,11 @@ function scheduleRecognition() {
 }
 
 function renderRecognized() {
-    const lines = Object.keys(recognizedRows)
-        .map(Number).sort((a, b) => a - b)
-        .filter(r => recognizedRows[r])
-        .map(r => `${String(r + 1).padStart(2, ' ')}  ${recognizedRows[r]}`);
-    recognizedEl.textContent = lines.length ? lines.join('\n') : '(nothing recognized yet)';
+    const withText = Object.keys(recognizedRows).map(Number).filter(r => recognizedRows[r]);
+    const last = withText.length ? Math.max(...withText) : -1;
+    const lines = [];
+    for (let r = 0; r <= last; r++) lines.push(recognizedRows[r] || '');
+    editorApi.setLines(lines);
 }
 
 async function runRecognition() {
@@ -236,7 +235,7 @@ canvas.addEventListener('pointercancel', endPointer);
 
 document.addEventListener('selectstart', e => {
     const el = e.target.nodeType === 1 ? e.target : e.target.parentElement;
-    if (!el || !el.closest('pre')) e.preventDefault();
+    if (!el || !el.closest('pre, #editor')) e.preventDefault();
 });
 
 // Block iOS zoom gestures on the writing area

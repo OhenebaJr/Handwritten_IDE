@@ -46,3 +46,10 @@ pre {
     background: #f4f4f4;
     padding: .5rem;
 }
+
+#editor {
+    height: 220px;
+    border: 1px solid #888;
+    -webkit-user-select: text;
+    user-select: text;
+}

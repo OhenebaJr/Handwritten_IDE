@@ -19,14 +19,16 @@
         <canvas id="ink"></canvas>
     </div>
 
-    <h3>Recognized text <span id="recognizeStatus"></span></h3>
-    <pre id="recognizedText">(nothing recognized yet)</pre>
+    <h3>Recognized code <span id="recognizeStatus"></span></h3>
+    <div id="editor"></div>
 
     <h3>Strokes per row</h3>
     <pre id="rowSummary">(none yet)</pre>
     <h3>Last Stroke</h3>
     <pre id="lastStroke">(none yet)</pre>
 
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
+    <script src="js/editor.js"></script>
     <script src="js/capture.js"></script>
 </body>
 </html>
