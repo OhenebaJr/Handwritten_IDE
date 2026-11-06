@@ -5,6 +5,7 @@ const INITIAL_ROWS = 11;
 const MIN_EMPTY_ROWS = 3;        // keep at least this many empty rows below the last used row
 const ALLOWED_TYPES = ['pen'];   // stylus only for drawing
 const ALLOW_FINGER_SCROLL = true;
+const RECOGNIZE_DELAY_MS = 800;  // pause after the last pen-up before recognition runs
 
 const area = document.getElementById('area');
 const canvas = document.getElementById('ink');
@@ -12,12 +13,21 @@ const ctx = canvas.getContext('2d');
 const statusEl = document.getElementById('status');
 const lastEl = document.getElementById('lastStroke');
 const rowSummaryEl = document.getElementById('rowSummary');
+const recognizedEl = document.getElementById('recognizedText');
+const recognizeStatusEl = document.getElementById('recognizeStatus');
 
 const strokes = [];
 let current = null;
 let nextId = 1;
 let rows = INITIAL_ROWS;
 let touchScroll = null;
+
+// ---- Recognition state ----
+const dirtyRows = new Set();     // rows with strokes not yet recognized
+const recognizedRows = {};       // row index -> recognized text
+let recognizeTimer = null;
+let recognizeInFlight = false;
+let generation = 0;              // bumped on Clear so late responses are ignored
 
 // ---- Layout ----
 function canvasHeight() { return TOP_MARGIN + rows * LINE_HEIGHT; }
@@ -114,6 +124,57 @@ function updateSummary() {
     statusEl.textContent = `Strokes: ${strokes.length} | Rows: ${rows}`;
 }
 
+// ---- Recognition ----
+function scheduleRecognition() {
+    clearTimeout(recognizeTimer);
+    recognizeTimer = setTimeout(runRecognition, RECOGNIZE_DELAY_MS);
+}
+
+function renderRecognized() {
+    const lines = Object.keys(recognizedRows)
+        .map(Number).sort((a, b) => a - b)
+        .filter(r => recognizedRows[r])
+        .map(r => `${String(r + 1).padStart(2, ' ')}  ${recognizedRows[r]}`);
+    recognizedEl.textContent = lines.length ? lines.join('\n') : '(nothing recognized yet)';
+}
+
+async function runRecognition() {
+    if (recognizeInFlight) { scheduleRecognition(); return; }
+    if (dirtyRows.size === 0) return;
+
+    const rowsToSend = [...dirtyRows];
+    dirtyRows.clear();
+    const myGeneration = generation;
+    recognizeInFlight = true;
+    recognizeStatusEl.textContent = '(recognizing...)';
+
+    try {
+        const payload = { strokes: strokes.filter(s => rowsToSend.includes(s.row)) };
+        const res = await fetch('/api/recognize', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const results = await res.json();
+
+        if (myGeneration !== generation) return;   // Clear was pressed meanwhile
+        for (const r of rowsToSend) recognizedRows[r] = '';
+        for (const rr of results) recognizedRows[rr.row] = rr.text;
+        renderRecognized();
+        recognizeStatusEl.textContent = '';
+    } catch (err) {
+        // Put the rows back so the next pause retries them
+        if (myGeneration === generation) {
+            rowsToSend.forEach(r => dirtyRows.add(r));
+            recognizeStatusEl.textContent = `(recognition failed: ${err.message})`;
+        }
+    } finally {
+        recognizeInFlight = false;
+        if (dirtyRows.size > 0 && myGeneration === generation) scheduleRecognition();
+    }
+}
+
 // ---- Pointer handling ----
 canvas.addEventListener('pointerdown', e => {
     if (e.pointerType === 'touch' && ALLOW_FINGER_SCROLL) {
@@ -123,7 +184,7 @@ canvas.addEventListener('pointerdown', e => {
     }
     if (!ALLOWED_TYPES.includes(e.pointerType)) return;
     e.preventDefault();
-    canvas.setPointerCapture(e.pointerId); 
+    canvas.setPointerCapture(e.pointerId);
     setInkStyle();
     current = { id: nextId++, pointerType: e.pointerType, row: null, points: [toPoint(e)] };
 });
@@ -160,6 +221,8 @@ function endPointer(e) {
         rows = current.row + 1 + MIN_EMPTY_ROWS;
         resizeCanvas();
     }
+    dirtyRows.add(current.row);
+    scheduleRecognition();
     current = null;
     updateSummary();
 }
@@ -194,6 +257,12 @@ document.getElementById('clearBtn').addEventListener('click', () => {
     area.scrollTop = 0;
     resizeCanvas();
     lastEl.textContent = '(none yet)';
+    generation++;
+    clearTimeout(recognizeTimer);
+    dirtyRows.clear();
+    for (const k of Object.keys(recognizedRows)) delete recognizedRows[k];
+    renderRecognized();
+    recognizeStatusEl.textContent = '';
     updateSummary();
 });
 
