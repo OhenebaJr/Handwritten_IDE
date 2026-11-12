@@ -1,3 +1,4 @@
+using Handwritten_IDE.Analysis;
 using Handwritten_IDE.Ink;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -10,5 +11,7 @@ app.UseStaticFiles();
 app.MapGet("/api/recognizers", () => InkRecognitionService.ListRecognizers());
 app.MapPost("/api/recognize", async (RecognizeRequest request) => 
 await InkRecognitionService.RecognizeAsync(request));
+app.MapPost("/api/validate", (ValidateRequest request) =>
+    CodeAnalysisService.Validate(request.Code ?? ""));
 
 app.Run();
