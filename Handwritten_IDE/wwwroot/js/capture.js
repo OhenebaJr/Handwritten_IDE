@@ -1,7 +1,7 @@
 // ---- Tunable constants (to be set during testing on the iPad) ----
 const LINE_HEIGHT = 35;          // px per ruled row
 const TOP_MARGIN = 10;           // px above the first row
-const INITIAL_ROWS = 12;
+const INITIAL_ROWS = 10;
 const MIN_EMPTY_ROWS = 3;        // keep at least this many empty rows below the last used row
 const ALLOWED_TYPES = ['pen'];   // stylus only for drawing
 const ALLOW_FINGER_SCROLL = true;

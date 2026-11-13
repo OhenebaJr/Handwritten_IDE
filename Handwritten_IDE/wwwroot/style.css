@@ -53,3 +53,37 @@ pre {
     -webkit-user-select: text;
     user-select: text;
 }
+
+.problems {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-height: 160px;
+    overflow: auto;
+    border: 1px solid #888;
+    background: #f4f4f4;
+    font-size: 14px;
+}
+
+    .problems li {
+        padding: .4rem .6rem;
+        border-bottom: 1px solid #ddd;
+    }
+
+        .problems li:last-child {
+            border-bottom: none;
+        }
+
+        .problems li.error {
+            border-left: 4px solid #d93025;
+        }
+
+        .problems li.warning {
+            border-left: 4px solid #f9ab00;
+        }
+
+        .problems li.none {
+            color: #666;
+        }
+
+

@@ -21,7 +21,11 @@
 
         // Remove old markers straight away, they may point to outdated positions
         monaco.editor.setModelMarkers(editor.getModel(), 'roslyn', []);
-        if (!code.trim()) return;
+        if (!code.trim())
+        {
+            showProblems([]);
+            return;
+        }
 
         try {
             const res = await fetch('/api/validate', {
@@ -31,8 +35,10 @@
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             const diagnostics = await res.json();
+
             if (myId !== validationId) return;   // the code changed while waiting
             showMarkers(diagnostics);
+            showProblems(diagnostics);
         } catch (err) {
             console.error('Validation failed:', err);
         }
@@ -64,6 +70,32 @@
             };
         });
         monaco.editor.setModelMarkers(model, 'roslyn', markers);
+    }
+
+    function showProblems(diagnostics) {
+        const list = document.getElementById('problems');
+        const count = document.getElementById('problemCount');
+        list.innerHTML = '';
+
+        if (diagnostics.length === 0) {
+            const li = document.createElement('li');
+            li.className = 'none';
+            li.textContent = 'No problems';
+            list.appendChild(li);
+            count.textContent = '';
+            return;
+        }
+
+        const errors = diagnostics.filter(d => d.severity === 'Error').length;
+        const warnings = diagnostics.length - errors;
+        count.textContent = `(${errors} error(s), ${warnings} warning(s))`;
+
+        for (const d of diagnostics) {
+            const li = document.createElement('li');
+            li.className = d.severity === 'Error' ? 'error' : 'warning';
+            li.textContent = `Line ${d.startLine}: ${d.id}: ${d.message}`;
+            list.appendChild(li);
+        }
     }
 
     require.config({
