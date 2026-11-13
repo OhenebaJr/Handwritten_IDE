@@ -22,10 +22,17 @@
     <h3>Recognized code <span id="recognizeStatus"></span></h3>
     <div id="editor"></div>
 
+    <div class="toolbar">
+        <button id="runBtn">Run</button>
+    </div>
+
     <h3>Problems <span id="problemCount"></span></h3>
     <ul id="problems" class="problems">
         <li class="none">No problems</li>
     </ul>
+
+    <h3>Output</h3>
+    <pre id="output">(not run yet)</pre>
 
     <h3>Strokes per row</h3>
     <pre id="rowSummary">(none yet)</pre>
@@ -34,6 +41,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.52.2/min/vs/loader.js"></script>
     <script src="js/editor.js"></script>
+    <script src="js/run.js"></script>
     <script src="js/capture.js"></script>
 </body>
 </html>

@@ -12,6 +12,9 @@
             pendingText = lines.join('\n');
             if (editor) editor.setValue(pendingText);
             validate(pendingText);
+        },
+        getCode() {
+            return pendingText;
         }
     };
 
