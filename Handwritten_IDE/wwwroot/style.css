@@ -87,3 +87,18 @@ pre {
         }
 
 
+.input-row {
+    display: flex;
+    gap: .5rem;
+    margin-top: .4rem;
+}
+
+    .input-row[hidden] {
+        display: none;
+    }
+
+    .input-row input {
+        flex: 1;
+        font-size: 16px;
+        padding: .4rem .6rem;
+    }

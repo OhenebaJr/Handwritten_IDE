@@ -1,45 +1,104 @@
-﻿// Run button: sends the recognized code to /api/run and shows the result.
+﻿// Run button: opens a WebSocket to /ws/run, shows the program output as it arrives
+// and sends the lines typed into the input box back to the running program.
 (function () {
     const runBtn = document.getElementById('runBtn');
     const output = document.getElementById('output');
+    const inputRow = document.getElementById('inputRow');
+    const inputBox = document.getElementById('inputBox');
+    const inputSend = document.getElementById('inputSend');
 
-    runBtn.addEventListener('click', async () => {
+    let socket = null;
+
+    runBtn.addEventListener('click', () => {
         const code = editorApi.getCode();
         if (!code.trim()) {
             output.textContent = 'Nothing to run.';
             return;
         }
-
-        runBtn.disabled = true;
-        output.textContent = 'Running...';
-        try {
-            const res = await fetch('/api/run', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ code })
-            });
-            if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            show(await res.json());
-        } catch (err) {
-            output.textContent = `Run failed: ${err.message}`;
-        } finally {
-            runBtn.disabled = false;
-        }
+        if (socket) socket.close();   // abandon a previous run that is still waiting
+        startRun(code);
     });
 
-    function show(r) {
-        if (r.status === 'compile-error') {
-            const lines = r.diagnostics
+    function startRun(code) {
+        output.textContent = '';
+        inputBox.value = '';
+        inputBox.placeholder = 'Type input for the program and press Enter';
+        inputRow.hidden = false;
+
+        const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+        const ws = new WebSocket(`${proto}://${location.host}/ws/run`);
+        socket = ws;
+
+        ws.onopen = () => ws.send(JSON.stringify({ type: 'run', code }));
+
+        ws.onmessage = e => {
+            if (socket !== ws) return;   // message from an abandoned run
+            handle(JSON.parse(e.data), ws);
+        };
+
+        ws.onerror = () => {
+            if (socket === ws) append('\n[connection error]');
+        };
+
+        ws.onclose = () => {
+            if (socket === ws) {
+                socket = null;
+                inputRow.hidden = true;
+            }
+        };
+    }
+
+    function handle(m, ws) {
+        switch (m.type) {
+            case 'output':
+                append(m.text);
+                break;
+            case 'input-request':
+                inputBox.placeholder = 'The program is waiting for input';
+                inputBox.focus();
+                break;
+            case 'finished':
+                showResult(m);
+                inputRow.hidden = true;
+                ws.close();
+                break;
+        }
+    }
+
+    function showResult(m) {
+        if (m.status === 'compile-error') {
+            const lines = (m.diagnostics || [])
                 .filter(d => d.severity === 'Error')
                 .map(d => `Line ${d.startLine}: ${d.id}: ${d.message}`);
-            output.textContent = 'Compilation failed:\n' + lines.join('\n');
+            output.textContent = 'Compilation failed:\n' + (m.error ? m.error + '\n' : '') + lines.join('\n');
             return;
         }
-
-        let text = r.output || '';
-        if (r.outputTruncated) text += '\n[Output truncated]';
-        if (r.error) text += `\n[${r.status}] ${r.error}`;
-        if (r.status === 'ok' && !text) text = '(program finished with no output)';
-        output.textContent = text;
+        if (m.truncated) append('\n[Output truncated]');
+        if (m.error) append(`\n[${m.status}] ${m.error}`);
+        if (m.status === 'ok' && !output.textContent) {
+            output.textContent = '(program finished with no output)';
+        }
     }
+
+    function append(text) {
+        output.textContent += text;
+        output.scrollTop = output.scrollHeight;
+    }
+
+    function sendInput() {
+        if (!socket || socket.readyState !== WebSocket.OPEN) return;
+        const text = inputBox.value;
+        append(text + '\n');   // echo the typed line like a console does
+        socket.send(JSON.stringify({ type: 'input', text }));
+        inputBox.value = '';
+        inputBox.placeholder = 'Type input for the program and press Enter';
+    }
+
+    inputSend.addEventListener('click', sendInput);
+    inputBox.addEventListener('keydown', e => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            sendInput();
+        }
+    });
 })();
